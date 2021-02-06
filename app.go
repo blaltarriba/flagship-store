@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -17,35 +18,33 @@ type App struct {
 	Checkouts []models.Checkout
 }
 
-func (a *App) Initialize(checkouts []models.Checkout) {
-
-	a.Checkouts = checkouts
-
-	a.Router = mux.NewRouter().StrictSlash(true)
-	a.initializeRoutes()
+func (app *App) Initialize(checkouts []models.Checkout) {
+	app.Checkouts = checkouts
+	app.Router = mux.NewRouter().StrictSlash(true)
+	app.initializeRoutes()
 }
 
-func (a *App) Run(addr string) {
+func (app *App) Run(addr string) {
 	fmt.Println("My first Golang application")
-	log.Fatal(http.ListenAndServe(addr, a.Router))
+	log.Fatal(http.ListenAndServe(addr, app.Router))
 }
 
-func (a *App) initializeRoutes() {
-	a.Router.HandleFunc("/checkouts", a.createNewCheckout).Methods("POST")
+func (app *App) initializeRoutes() {
+	app.Router.HandleFunc("/checkouts", app.createNewCheckout).Methods("POST")
 }
 
-func (a *App) createNewCheckout(w http.ResponseWriter, r *http.Request) {
-	reqBody, _ := ioutil.ReadAll(r.Body)
+func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Request) {
+	body, _ := ioutil.ReadAll(request.Body)
 	var productCommand commands.Product
-	json.Unmarshal(reqBody, &productCommand)
+	json.Unmarshal(body, &productCommand)
 
-	products := []string{
-		productCommand.Code,
+	checkout := models.Checkout{
+		Id:       uuid.New(),
+		Products: []string{productCommand.Code},
 	}
-	var checkout models.Checkout
-	checkout.Id = 1234
-	checkout.Products = products
-	a.Checkouts = append(a.Checkouts, checkout)
 
-	json.NewEncoder(w).Encode(checkout)
+	app.Checkouts = append(app.Checkouts, checkout)
+
+	response.WriteHeader(http.StatusCreated)
+	json.NewEncoder(response).Encode(checkout)
 }

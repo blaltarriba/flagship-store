@@ -1,6 +1,8 @@
 package models
 
+import "github.com/google/uuid"
+
 type Checkout struct {
-	Id       int      `json:"Id"`
-	Products []string `json:"Products"`
+	Id       uuid.UUID `json:"id"`
+	Products []string  `json:"products"`
 }

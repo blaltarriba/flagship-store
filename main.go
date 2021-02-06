@@ -3,10 +3,10 @@ package main
 import "lana/flagship-store/models"
 
 func main() {
-	a := App{}
-	a.Initialize(Checkouts)
+	app := App{}
+	app.Initialize(checkouts)
 
-	a.Run(":10000")
+	app.Run(":10000")
 }
 
-var Checkouts []models.Checkout
+var checkouts []models.Checkout
