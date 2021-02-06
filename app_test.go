@@ -96,9 +96,7 @@ func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
 	payload := []byte(`{"product":"PEN"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
-	response := executeRequest(req)
-
-	assert.EqualValues(t, 204, response.Code)
+	executeRequest(req)
 
 	modifiedCheckout := a.Checkouts[0]
 	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
