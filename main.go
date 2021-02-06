@@ -1,9 +1,12 @@
 package main
 
-import (
-	"fmt"
-)
+import "lana/flagship-store/models"
 
 func main() {
-	fmt.Println("My first Golang application")
+	app := App{}
+	app.Initialize(checkouts)
+
+	app.Run(":10000")
 }
+
+var checkouts []models.Checkout
