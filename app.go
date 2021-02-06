@@ -31,6 +31,7 @@ func (app *App) Run(addr string) {
 
 func (app *App) initializeRoutes() {
 	app.Router.HandleFunc("/checkouts", app.createNewCheckout).Methods("POST")
+	app.Router.HandleFunc("/checkouts/{id}", app.addProductToCheckout).Methods("PATCH")
 }
 
 func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Request) {
@@ -39,7 +40,7 @@ func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Re
 	json.Unmarshal(body, &productCommand)
 
 	checkout := models.Checkout{
-		Id:       uuid.New(),
+		Id:       uuid.NewString(),
 		Products: []string{productCommand.Code},
 	}
 
@@ -47,4 +48,26 @@ func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Re
 
 	response.WriteHeader(http.StatusCreated)
 	json.NewEncoder(response).Encode(checkout)
+}
+
+func (app *App) addProductToCheckout(response http.ResponseWriter, request *http.Request) {
+	body, _ := ioutil.ReadAll(request.Body)
+	var addProductCommand commands.AddProduct
+	json.Unmarshal(body, &addProductCommand)
+
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	var checkout models.Checkout
+
+	for i := range app.Checkouts {
+		if app.Checkouts[i].Id == id {
+			checkout = app.Checkouts[i]
+			checkout.Products = append(checkout.Products, addProductCommand.Code)
+			app.Checkouts[i] = checkout
+			break
+		}
+	}
+
+	response.WriteHeader(http.StatusNoContent)
 }
