@@ -238,7 +238,7 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, 7.50, responseCheckout.Amount)
+	assert.EqualValues(t, "7.50€", responseCheckout.Amount)
 }
 
 func TestReturn404RetrievingCheckoutAmountWhenCheckoutDoesNotExists(t *testing.T) {
@@ -269,7 +269,7 @@ func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, float64(5), responseCheckout.Amount)
+	assert.EqualValues(t, "5.00€", responseCheckout.Amount)
 }
 
 func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWithPromotion(t *testing.T) {
@@ -287,7 +287,7 @@ func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWith
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, float64(15), responseCheckout.Amount)
+	assert.EqualValues(t, "15.00€", responseCheckout.Amount)
 }
 
 func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t *testing.T) {
@@ -305,7 +305,7 @@ func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t 
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, float64(45), responseCheckout.Amount)
+	assert.EqualValues(t, "45.00€", responseCheckout.Amount)
 }
 
 func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithDiscount(t *testing.T) {
@@ -323,7 +323,7 @@ func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithD
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, float64(40), responseCheckout.Amount)
+	assert.EqualValues(t, "40.00€", responseCheckout.Amount)
 }
 
 func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDiscount(t *testing.T) {
@@ -341,7 +341,7 @@ func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDi
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
-	assert.EqualValues(t, float64(22.5), responseCheckout.Amount)
+	assert.EqualValues(t, "22.50€", responseCheckout.Amount)
 }
 
 func TestReturn204WhenDeleteCheckout(t *testing.T) {
