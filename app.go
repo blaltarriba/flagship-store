@@ -15,14 +15,16 @@ import (
 )
 
 type App struct {
-	Router    *mux.Router
-	Checkouts []models.Checkout
-	Products  map[string]models.Product
+	Router                *mux.Router
+	Checkouts             []models.Checkout
+	Products              map[string]models.Product
+	ProductsWithPromotion map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product) {
+func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product) {
 	app.Checkouts = checkouts
 	app.Products = products
+	app.ProductsWithPromotion = productsWithPromotion
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -78,7 +80,7 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	id := vars["id"]
 
 	checkout := searchCheckoutById(id, app.Checkouts)
-	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products)
+	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion)
 	responseCheckout := responses.Checkout{
 		Amount: formatCheckoutAmount(checkoutAmount),
 	}
@@ -99,9 +101,9 @@ func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout 
 	return checkout
 }
 
-func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product) int {
+func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product) int {
 	productRealUnits := calculateRealProductUnits(checkoutProducts)
-	productUnits := calculatePayableProductUnits(productRealUnits)
+	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotion)
 
 	var amount int
 	for productCode, quantity := range productUnits {
@@ -119,10 +121,10 @@ func calculateRealProductUnits(checkoutProducts []string) map[string]int {
 	return productUnits
 }
 
-func calculatePayableProductUnits(productRealUnits map[string]int) map[string]int {
+func calculatePayableProductUnits(productRealUnits map[string]int, productsWithPromotion map[string]models.Product) map[string]int {
 	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
 	for productCode, quantity := range productRealUnits {
-		if productCode == "PEN" {
+		if _, found := productsWithPromotion[productCode]; found {
 			productUnits[productCode] = calculatePayableUnitsApplying2X1Promotion(quantity)
 			continue
 		}

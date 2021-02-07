@@ -18,11 +18,11 @@ var a App
 
 func TestMain(m *testing.M) {
 	var checkouts []models.Checkout
-	var products map[string]models.Product
-	products = initialize_products()
+	products := initialize_products()
+	productsWithPromotion := initialize_products_with_promotions()
 
 	a = App{}
-	a.Initialize(checkouts, products)
+	a.Initialize(checkouts, products, productsWithPromotion)
 
 	code := m.Run()
 
@@ -64,6 +64,19 @@ func initialize_products() map[string]models.Product {
 	products[pen.Code] = pen
 	products[tshirt.Code] = tshirt
 	products[mug.Code] = mug
+	return products
+}
+
+func initialize_products_with_promotions() map[string]models.Product {
+	products := make(map[string]models.Product)
+
+	pen := models.Product{
+		Code:  "PEN",
+		Name:  "Lana Pen",
+		Price: 500,
+	}
+
+	products[pen.Code] = pen
 	return products
 }
 
@@ -164,7 +177,7 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 	assert.EqualValues(t, 7.50, responseCheckout.Amount)
 }
 
-func TestAmountWith2X1PromotionWhenCheckoutContainsMoreThanTwoPens(t *testing.T) {
+func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion(t *testing.T) {
 	clearCheckouts()
 
 	checkout := models.Checkout{
@@ -180,4 +193,22 @@ func TestAmountWith2X1PromotionWhenCheckoutContainsMoreThanTwoPens(t *testing.T)
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
 	assert.EqualValues(t, float64(5), responseCheckout.Amount)
+}
+
+func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWithPromotion(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG", "MUG"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(15), responseCheckout.Amount)
 }
