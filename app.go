@@ -9,6 +9,7 @@ import (
 	"lana/flagship-store/services/responses"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -177,8 +178,10 @@ func calculateAmountWithDiscount(quantity int, price int) int {
 	return unitPriceWithDiscount * quantity
 }
 
-func formatCheckoutAmount(amount int) float64 {
-	return float64(amount) / 100
+func formatCheckoutAmount(amount int) string {
+	amount_with_decimals := float64(amount) / 100
+	amount_with_fixed_decimals := strconv.FormatFloat(amount_with_decimals, 'f', 2, 64)
+	return amount_with_fixed_decimals + "€"
 }
 
 func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Request) {
