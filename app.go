@@ -185,6 +185,15 @@ func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Reque
 	vars := mux.Vars(request)
 	id := vars["id"]
 
+	_, existCheckout := app.Checkouts[id]
+	if !existCheckout {
+		response.WriteHeader(http.StatusNotFound)
+		checkoutNotFound := responses.CheckoutNotFound{
+			Message: "Checkout " + id + " not found",
+		}
+		json.NewEncoder(response).Encode(checkoutNotFound)
+		return
+	}
 	delete(app.Checkouts, id)
 
 	response.WriteHeader(http.StatusNoContent)
