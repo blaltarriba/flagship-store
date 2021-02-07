@@ -17,9 +17,10 @@ var a App
 
 func TestMain(m *testing.M) {
 	var checkouts []models.Checkout
+	var products []models.Product
 
 	a = App{}
-	a.Initialize(checkouts)
+	a.Initialize(checkouts, products)
 
 	code := m.Run()
 

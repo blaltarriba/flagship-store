@@ -16,10 +16,12 @@ import (
 type App struct {
 	Router    *mux.Router
 	Checkouts []models.Checkout
+	Products  []models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout) {
+func (app *App) Initialize(checkouts []models.Checkout, products []models.Product) {
 	app.Checkouts = checkouts
+	app.Products = products
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
