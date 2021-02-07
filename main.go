@@ -11,7 +11,7 @@ func main() {
 	app.Run(":10000")
 }
 
-func populate_products(products []models.Product) []models.Product {
+func populate_products(products map[string]models.Product) map[string]models.Product {
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -27,11 +27,12 @@ func populate_products(products []models.Product) []models.Product {
 		Name:  "Lana Coffee Mug",
 		Price: 750,
 	}
-	products = append(products, pen)
-	products = append(products, tshirt)
-	products = append(products, mug)
+
+	products[pen.Code] = pen
+	products[tshirt.Code] = tshirt
+	products[mug.Code] = mug
 	return products
 }
 
 var checkouts []models.Checkout
-var products []models.Product
+var products map[string]models.Product
