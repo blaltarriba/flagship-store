@@ -86,6 +86,15 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 		return
 	}
 
+	if _, existProduct := app.Products[addProductCommand.Code]; !existProduct {
+		response.WriteHeader(http.StatusUnprocessableEntity)
+		productNotFound := responses.ProductNotFound{
+			Message: "Product " + addProductCommand.Code + " not found",
+		}
+		json.NewEncoder(response).Encode(productNotFound)
+		return
+	}
+
 	checkout.Products = append(checkout.Products, addProductCommand.Code)
 	app.Checkouts[checkout.Id] = checkout
 
