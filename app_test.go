@@ -373,3 +373,16 @@ func TestDeleteCheckout(t *testing.T) {
 
 	assert.EqualValues(t, 0, len(app.Checkouts))
 }
+
+func TestReturn404DeletingCheckoutWhenCheckoutDoesNotExists(t *testing.T) {
+	clearCheckouts()
+
+	req, _ := http.NewRequest("DELETE", "/checkouts/a_fake_checkout", nil)
+	response := executeRequest(req)
+
+	var checkoutNotFound responses.CheckoutNotFound
+	json.Unmarshal(response.Body.Bytes(), &checkoutNotFound)
+
+	assert.EqualValues(t, 404, response.Code)
+	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
+}
