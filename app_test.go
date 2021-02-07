@@ -121,6 +121,21 @@ func TestCreateCheckout(t *testing.T) {
 	assert.EqualValues(t, 1, len(createdCheckout.Products))
 }
 
+func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
+	clearCheckouts()
+
+	payload := []byte(`{"product-code":"FAKE"}`)
+
+	req, _ := http.NewRequest("POST", "/checkouts", bytes.NewBuffer(payload))
+	response := executeRequest(req)
+
+	var productNotFound responses.ProductNotFound
+	json.Unmarshal(response.Body.Bytes(), &productNotFound)
+
+	assert.EqualValues(t, 404, response.Code)
+	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
+}
+
 func TestReturn204WhenAddProductToCheckout(t *testing.T) {
 	clearCheckouts()
 
