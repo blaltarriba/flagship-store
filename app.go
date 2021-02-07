@@ -16,13 +16,13 @@ import (
 
 type App struct {
 	Router                *mux.Router
-	Checkouts             []models.Checkout
+	Checkouts             map[string]models.Checkout
 	Products              map[string]models.Product
 	ProductsWithPromotion map[string]models.Product
 	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
+func (app *App) Initialize(checkouts map[string]models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
 	app.Checkouts = checkouts
 	app.Products = products
 	app.ProductsWithPromotion = productsWithPromotion
@@ -37,12 +37,13 @@ func (app *App) Run(addr string) {
 }
 
 func (app *App) initializeRoutes() {
-	app.Router.HandleFunc("/checkouts", app.createNewCheckout).Methods("POST")
+	app.Router.HandleFunc("/checkouts", app.createCheckout).Methods("POST")
 	app.Router.HandleFunc("/checkouts/{id}", app.addProductToCheckout).Methods("PATCH")
+	app.Router.HandleFunc("/checkouts/{id}", app.deleteCheckout).Methods("DELETE")
 	app.Router.HandleFunc("/checkouts/{id}/amount", app.retrieveCheckoutAmount).Methods("GET")
 }
 
-func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Request) {
+func (app *App) createCheckout(response http.ResponseWriter, request *http.Request) {
 	body, _ := ioutil.ReadAll(request.Body)
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
@@ -52,7 +53,7 @@ func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Re
 		Products: []string{productCommand.Code},
 	}
 
-	app.Checkouts = append(app.Checkouts, checkout)
+	app.Checkouts[checkout.Id] = checkout
 
 	response.WriteHeader(http.StatusCreated)
 	json.NewEncoder(response).Encode(checkout)
@@ -66,13 +67,10 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	for index, checkout := range app.Checkouts {
-		if checkout.Id == id {
-			checkout.Products = append(checkout.Products, addProductCommand.Code)
-			app.Checkouts[index] = checkout
-			break
-		}
-	}
+	checkout, _ := app.Checkouts[id]
+
+	checkout.Products = append(checkout.Products, addProductCommand.Code)
+	app.Checkouts[checkout.Id] = checkout
 
 	response.WriteHeader(http.StatusNoContent)
 }
@@ -90,16 +88,8 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	json.NewEncoder(response).Encode(responseCheckout)
 }
 
-func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout {
-	var checkout models.Checkout
-
-	for _, currentCheckout := range checkouts {
-		if currentCheckout.Id == id {
-			checkout = currentCheckout
-			break
-		}
-	}
-
+func searchCheckoutById(id string, checkouts map[string]models.Checkout) models.Checkout {
+	checkout, _ := checkouts[id]
 	return checkout
 }
 
@@ -159,4 +149,13 @@ func calculateAmountWithDiscount(quantity int, price int) int {
 
 func formatCheckoutAmount(amount int) float64 {
 	return float64(amount) / 100
+}
+
+func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	delete(app.Checkouts, id)
+
+	response.WriteHeader(http.StatusNoContent)
 }
