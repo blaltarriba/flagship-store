@@ -37,12 +37,13 @@ func (app *App) Run(addr string) {
 }
 
 func (app *App) initializeRoutes() {
-	app.Router.HandleFunc("/checkouts", app.createNewCheckout).Methods("POST")
+	app.Router.HandleFunc("/checkouts", app.createCheckout).Methods("POST")
 	app.Router.HandleFunc("/checkouts/{id}", app.addProductToCheckout).Methods("PATCH")
+	app.Router.HandleFunc("/checkouts/{id}", app.deleteCheckout).Methods("DELETE")
 	app.Router.HandleFunc("/checkouts/{id}/amount", app.retrieveCheckoutAmount).Methods("GET")
 }
 
-func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Request) {
+func (app *App) createCheckout(response http.ResponseWriter, request *http.Request) {
 	body, _ := ioutil.ReadAll(request.Body)
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
@@ -148,4 +149,13 @@ func calculateAmountWithDiscount(quantity int, price int) int {
 
 func formatCheckoutAmount(amount int) float64 {
 	return float64(amount) / 100
+}
+
+func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	delete(app.Checkouts, id)
+
+	response.WriteHeader(http.StatusNoContent)
 }
