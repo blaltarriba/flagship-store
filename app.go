@@ -48,6 +48,15 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
 
+	if _, existProduct := app.Products[productCommand.Code]; !existProduct {
+		response.WriteHeader(http.StatusNotFound)
+		productNotFound := responses.ProductNotFound{
+			Message: "Product " + productCommand.Code + " not found",
+		}
+		json.NewEncoder(response).Encode(productNotFound)
+		return
+	}
+
 	checkout := models.Checkout{
 		Id:       uuid.NewString(),
 		Products: []string{productCommand.Code},
