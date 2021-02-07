@@ -208,7 +208,7 @@ func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) 
 	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
 }
 
-func TestReturn200WhenRetrieveCheckoutAmount(t *testing.T) {
+func TestReturn200RetrievingCheckoutAmountWhenCheckoutExists(t *testing.T) {
 	clearCheckouts()
 
 	checkout := models.Checkout{
@@ -239,6 +239,19 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
 	assert.EqualValues(t, 7.50, responseCheckout.Amount)
+}
+
+func TestReturn404RetrievingCheckoutAmountWhenCheckoutDoesNotExists(t *testing.T) {
+	clearCheckouts()
+
+	req, _ := http.NewRequest("GET", "/checkouts/a_fake_checkout/amount", nil)
+	response := executeRequest(req)
+
+	var checkoutNotFound responses.CheckoutNotFound
+	json.Unmarshal(response.Body.Bytes(), &checkoutNotFound)
+
+	assert.EqualValues(t, 404, response.Code)
+	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
 }
 
 func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion(t *testing.T) {
