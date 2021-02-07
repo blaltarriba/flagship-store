@@ -76,7 +76,15 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, _ := app.Checkouts[id]
+	checkout, existCheckout := app.Checkouts[id]
+	if !existCheckout {
+		response.WriteHeader(http.StatusNotFound)
+		checkoutNotFound := responses.CheckoutNotFound{
+			Message: "Checkout " + id + " not found",
+		}
+		json.NewEncoder(response).Encode(checkoutNotFound)
+		return
+	}
 
 	checkout.Products = append(checkout.Products, addProductCommand.Code)
 	app.Checkouts[checkout.Id] = checkout
