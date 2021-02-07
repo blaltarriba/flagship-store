@@ -6,12 +6,13 @@ import (
 
 func main() {
 	app := App{}
-	app.Initialize(checkouts, populate_products(products), populate_products_with_promotion(productsWithPromotion))
+	app.Initialize(checkouts, populate_products(products), populate_products_with_promotion(productsWithPromotion), populate_products_with_discount(productsWithDiscount))
 
 	app.Run(":10000")
 }
 
 func populate_products(products map[string]models.Product) map[string]models.Product {
+	products = make(map[string]models.Product)
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -34,7 +35,8 @@ func populate_products(products map[string]models.Product) map[string]models.Pro
 	return products
 }
 
-func populate_products_with_promotion(productsWithPromotion map[string]models.Product) map[string]models.Product {
+func populate_products_with_promotion(products map[string]models.Product) map[string]models.Product {
+	products = make(map[string]models.Product)
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -44,6 +46,18 @@ func populate_products_with_promotion(productsWithPromotion map[string]models.Pr
 	return products
 }
 
+func populate_products_with_discount(products map[string]models.Product) map[string]models.Product {
+	products = make(map[string]models.Product)
+	tshirt := models.Product{
+		Code:  "TSHIRT",
+		Name:  "Lana T-Shirt",
+		Price: 2000,
+	}
+	products[tshirt.Code] = tshirt
+	return products
+}
+
 var checkouts []models.Checkout
 var products map[string]models.Product
 var productsWithPromotion map[string]models.Product
+var productsWithDiscount map[string]models.Product

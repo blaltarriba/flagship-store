@@ -19,12 +19,14 @@ type App struct {
 	Checkouts             []models.Checkout
 	Products              map[string]models.Product
 	ProductsWithPromotion map[string]models.Product
+	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product) {
+func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
 	app.Checkouts = checkouts
 	app.Products = products
 	app.ProductsWithPromotion = productsWithPromotion
+	app.ProductsWithDiscount = productsWithDiscount
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -80,7 +82,7 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	id := vars["id"]
 
 	checkout := searchCheckoutById(id, app.Checkouts)
-	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion)
+	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion, app.ProductsWithDiscount)
 	responseCheckout := responses.Checkout{
 		Amount: formatCheckoutAmount(checkoutAmount),
 	}
@@ -101,13 +103,17 @@ func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout 
 	return checkout
 }
 
-func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product) int {
+func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) int {
 	productRealUnits := calculateRealProductUnits(checkoutProducts)
 	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotion)
 
 	var amount int
 	for productCode, quantity := range productUnits {
 		product := products[productCode]
+		if _, hasDiscount := productsWithDiscount[productCode]; hasDiscount {
+			amount += calculateAmountWithDiscount(quantity, product.Price)
+			continue
+		}
 		amount += (product.Price * quantity)
 	}
 	return amount
@@ -141,6 +147,14 @@ func calculatePayableUnitsApplying2X1Promotion(quantity int) int {
 		return quantity / 2
 	}
 	return ((quantity - 1) / 2) + 1
+}
+
+func calculateAmountWithDiscount(quantity int, price int) int {
+	if quantity < 3 {
+		return price * quantity
+	}
+	unitPriceWithDiscount := (price * 75) / 100
+	return unitPriceWithDiscount * quantity
 }
 
 func formatCheckoutAmount(amount int) float64 {
