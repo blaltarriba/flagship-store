@@ -19,6 +19,7 @@ var a App
 func TestMain(m *testing.M) {
 	var checkouts []models.Checkout
 	var products map[string]models.Product
+	products = initialize_products()
 
 	a = App{}
 	a.Initialize(checkouts, products)
@@ -39,6 +40,31 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 
 func clearCheckouts() {
 	a.Checkouts = nil
+}
+
+func initialize_products() map[string]models.Product {
+	products := make(map[string]models.Product)
+
+	pen := models.Product{
+		Code:  "PEN",
+		Name:  "Lana Pen",
+		Price: 500,
+	}
+	tshirt := models.Product{
+		Code:  "TSHIRT",
+		Name:  "Lana T-Shirt",
+		Price: 2000,
+	}
+	mug := models.Product{
+		Code:  "MUG",
+		Name:  "Lana Coffee Mug",
+		Price: 750,
+	}
+
+	products[pen.Code] = pen
+	products[tshirt.Code] = tshirt
+	products[mug.Code] = mug
+	return products
 }
 
 func TestReturn200WhenCreateCheckout(t *testing.T) {
@@ -123,17 +149,9 @@ func TestReturn200WhenRetrieveCheckoutAmount(t *testing.T) {
 func TestAmountWhenCheckoutExists(t *testing.T) {
 	clearCheckouts()
 
-	a.Products = make(map[string]models.Product)
-	pen := models.Product{
-		Code:  "PEN",
-		Name:  "Lana Pen",
-		Price: 750,
-	}
-	a.Products[pen.Code] = pen
-
 	checkout := models.Checkout{
 		Id:       uuid.NewString(),
-		Products: []string{"PEN"},
+		Products: []string{"MUG"},
 	}
 	a.Checkouts = append(a.Checkouts, checkout)
 
@@ -144,4 +162,22 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
 
 	assert.EqualValues(t, 7.50, responseCheckout.Amount)
+}
+
+func TestAmountWith2X1PromotionWhenCheckoutContainsMoreThanTwoPens(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"PEN", "PEN"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(5), responseCheckout.Amount)
 }

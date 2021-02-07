@@ -100,12 +100,45 @@ func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout 
 }
 
 func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product) int {
+	productRealUnits := calculateRealProductUnits(checkoutProducts)
+	productUnits := calculatePayableProductUnits(productRealUnits)
+
 	var amount int
-	for _, checkoutProductCode := range checkoutProducts {
-		product := products[checkoutProductCode]
-		amount += product.Price
+	for productCode, quantity := range productUnits {
+		product := products[productCode]
+		amount += (product.Price * quantity)
 	}
 	return amount
+}
+
+func calculateRealProductUnits(checkoutProducts []string) map[string]int {
+	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
+	for _, checkoutProductCode := range checkoutProducts {
+		productUnits[checkoutProductCode] += 1
+	}
+	return productUnits
+}
+
+func calculatePayableProductUnits(productRealUnits map[string]int) map[string]int {
+	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
+	for productCode, quantity := range productRealUnits {
+		if productCode == "PEN" {
+			productUnits[productCode] = calculatePayableUnitsApplying2X1Promotion(quantity)
+			continue
+		}
+		productUnits[productCode] = quantity
+	}
+	return productUnits
+}
+
+func calculatePayableUnitsApplying2X1Promotion(quantity int) int {
+	if quantity == 0 {
+		return 0
+	}
+	if quantity%2 == 0 {
+		return quantity / 2
+	}
+	return ((quantity - 1) / 2) + 1
 }
 
 func formatCheckoutAmount(amount int) float64 {
