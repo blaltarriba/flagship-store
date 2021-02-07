@@ -136,7 +136,7 @@ func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
 	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
 }
 
-func TestReturn204WhenAddProductToCheckout(t *testing.T) {
+func TestReturn204AddingProductToCheckoutWhenCheckoutExists(t *testing.T) {
 	clearCheckouts()
 
 	checkout := models.Checkout{
@@ -170,6 +170,42 @@ func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
 	modifiedCheckout, _ := app.Checkouts[checkout.Id]
 	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
 	assert.EqualValues(t, "PEN", modifiedCheckout.Products[1])
+}
+
+func TestReturn404AddingProductToCheckoutWhenCheckoutDoesNotExists(t *testing.T) {
+	clearCheckouts()
+
+	payload := []byte(`{"product":"PEN"}`)
+
+	req, _ := http.NewRequest("PATCH", "/checkouts/a_fake_checkout", bytes.NewBuffer(payload))
+	response := executeRequest(req)
+
+	var checkoutNotFound responses.CheckoutNotFound
+	json.Unmarshal(response.Body.Bytes(), &checkoutNotFound)
+
+	assert.EqualValues(t, 404, response.Code)
+	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
+}
+
+func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG"},
+	}
+	app.Checkouts[checkout.Id] = checkout
+
+	payload := []byte(`{"product":"FAKE"}`)
+
+	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
+	response := executeRequest(req)
+
+	var productNotFound responses.ProductNotFound
+	json.Unmarshal(response.Body.Bytes(), &productNotFound)
+
+	assert.EqualValues(t, 422, response.Code)
+	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
 }
 
 func TestReturn200WhenRetrieveCheckoutAmount(t *testing.T) {
