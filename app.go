@@ -105,18 +105,22 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout := searchCheckoutById(id, app.Checkouts)
+	checkout, existCheckout := app.Checkouts[id]
+	if !existCheckout {
+		response.WriteHeader(http.StatusNotFound)
+		checkoutNotFound := responses.CheckoutNotFound{
+			Message: "Checkout " + id + " not found",
+		}
+		json.NewEncoder(response).Encode(checkoutNotFound)
+		return
+	}
+
 	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion, app.ProductsWithDiscount)
 	responseCheckout := responses.Checkout{
 		Amount: formatCheckoutAmount(checkoutAmount),
 	}
 	response.WriteHeader(http.StatusOK)
 	json.NewEncoder(response).Encode(responseCheckout)
-}
-
-func searchCheckoutById(id string, checkouts map[string]models.Checkout) models.Checkout {
-	checkout, _ := checkouts[id]
-	return checkout
 }
 
 func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) int {
