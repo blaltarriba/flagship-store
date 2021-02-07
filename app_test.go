@@ -17,7 +17,7 @@ import (
 var a App
 
 func TestMain(m *testing.M) {
-	var checkouts []models.Checkout
+	var checkouts map[string]models.Checkout
 	products := initialize_products()
 	productsWithPromotion := initialize_products_with_promotions()
 	productsWithDiscount := initialize_products_with_discount()
@@ -40,7 +40,7 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 }
 
 func clearCheckouts() {
-	a.Checkouts = nil
+	a.Checkouts = make(map[string]models.Checkout)
 }
 
 func initialize_products() map[string]models.Product {
@@ -128,7 +128,7 @@ func TestReturn204WhenAddProductToCheckout(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	payload := []byte(`{"product":"PEN"}`)
 
@@ -145,14 +145,14 @@ func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	payload := []byte(`{"product":"PEN"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
 	executeRequest(req)
 
-	modifiedCheckout := a.Checkouts[0]
+	modifiedCheckout, _ := a.Checkouts[checkout.Id]
 	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
 	assert.EqualValues(t, "PEN", modifiedCheckout.Products[1])
 }
@@ -164,7 +164,7 @@ func TestReturn200WhenRetrieveCheckoutAmount(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"PEN"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -179,7 +179,7 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -197,7 +197,7 @@ func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion
 		Id:       uuid.NewString(),
 		Products: []string{"PEN", "PEN"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -215,7 +215,7 @@ func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWith
 		Id:       uuid.NewString(),
 		Products: []string{"MUG", "MUG"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -233,7 +233,7 @@ func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t 
 		Id:       uuid.NewString(),
 		Products: []string{"TSHIRT", "TSHIRT", "TSHIRT"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -251,7 +251,7 @@ func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithD
 		Id:       uuid.NewString(),
 		Products: []string{"TSHIRT", "TSHIRT"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -269,7 +269,7 @@ func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDi
 		Id:       uuid.NewString(),
 		Products: []string{"MUG", "MUG", "MUG"},
 	}
-	a.Checkouts = append(a.Checkouts, checkout)
+	a.Checkouts[checkout.Id] = checkout
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)

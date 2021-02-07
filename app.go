@@ -16,13 +16,13 @@ import (
 
 type App struct {
 	Router                *mux.Router
-	Checkouts             []models.Checkout
+	Checkouts             map[string]models.Checkout
 	Products              map[string]models.Product
 	ProductsWithPromotion map[string]models.Product
 	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
+func (app *App) Initialize(checkouts map[string]models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
 	app.Checkouts = checkouts
 	app.Products = products
 	app.ProductsWithPromotion = productsWithPromotion
@@ -52,7 +52,7 @@ func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Re
 		Products: []string{productCommand.Code},
 	}
 
-	app.Checkouts = append(app.Checkouts, checkout)
+	app.Checkouts[checkout.Id] = checkout
 
 	response.WriteHeader(http.StatusCreated)
 	json.NewEncoder(response).Encode(checkout)
@@ -66,13 +66,10 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	for index, checkout := range app.Checkouts {
-		if checkout.Id == id {
-			checkout.Products = append(checkout.Products, addProductCommand.Code)
-			app.Checkouts[index] = checkout
-			break
-		}
-	}
+	checkout, _ := app.Checkouts[id]
+
+	checkout.Products = append(checkout.Products, addProductCommand.Code)
+	app.Checkouts[checkout.Id] = checkout
 
 	response.WriteHeader(http.StatusNoContent)
 }
@@ -90,16 +87,8 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	json.NewEncoder(response).Encode(responseCheckout)
 }
 
-func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout {
-	var checkout models.Checkout
-
-	for _, currentCheckout := range checkouts {
-		if currentCheckout.Id == id {
-			checkout = currentCheckout
-			break
-		}
-	}
-
+func searchCheckoutById(id string, checkouts map[string]models.Checkout) models.Checkout {
+	checkout, _ := checkouts[id]
 	return checkout
 }
 
