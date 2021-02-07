@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"lana/flagship-store/models"
 	"lana/flagship-store/services/commands"
+	"lana/flagship-store/services/responses"
 	"log"
 	"net/http"
 
@@ -14,12 +15,18 @@ import (
 )
 
 type App struct {
-	Router    *mux.Router
-	Checkouts []models.Checkout
+	Router                *mux.Router
+	Checkouts             []models.Checkout
+	Products              map[string]models.Product
+	ProductsWithPromotion map[string]models.Product
+	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts []models.Checkout) {
+func (app *App) Initialize(checkouts []models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
 	app.Checkouts = checkouts
+	app.Products = products
+	app.ProductsWithPromotion = productsWithPromotion
+	app.ProductsWithDiscount = productsWithDiscount
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -32,6 +39,7 @@ func (app *App) Run(addr string) {
 func (app *App) initializeRoutes() {
 	app.Router.HandleFunc("/checkouts", app.createNewCheckout).Methods("POST")
 	app.Router.HandleFunc("/checkouts/{id}", app.addProductToCheckout).Methods("PATCH")
+	app.Router.HandleFunc("/checkouts/{id}/amount", app.retrieveCheckoutAmount).Methods("GET")
 }
 
 func (app *App) createNewCheckout(response http.ResponseWriter, request *http.Request) {
@@ -58,16 +66,97 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	var checkout models.Checkout
-
-	for i := range app.Checkouts {
-		if app.Checkouts[i].Id == id {
-			checkout = app.Checkouts[i]
+	for index, checkout := range app.Checkouts {
+		if checkout.Id == id {
 			checkout.Products = append(checkout.Products, addProductCommand.Code)
-			app.Checkouts[i] = checkout
+			app.Checkouts[index] = checkout
 			break
 		}
 	}
 
 	response.WriteHeader(http.StatusNoContent)
+}
+
+func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	checkout := searchCheckoutById(id, app.Checkouts)
+	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion, app.ProductsWithDiscount)
+	responseCheckout := responses.Checkout{
+		Amount: formatCheckoutAmount(checkoutAmount),
+	}
+	response.WriteHeader(http.StatusOK)
+	json.NewEncoder(response).Encode(responseCheckout)
+}
+
+func searchCheckoutById(id string, checkouts []models.Checkout) models.Checkout {
+	var checkout models.Checkout
+
+	for _, currentCheckout := range checkouts {
+		if currentCheckout.Id == id {
+			checkout = currentCheckout
+			break
+		}
+	}
+
+	return checkout
+}
+
+func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) int {
+	productRealUnits := calculateRealProductUnits(checkoutProducts)
+	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotion)
+
+	var amount int
+	for productCode, quantity := range productUnits {
+		product := products[productCode]
+		if _, hasDiscount := productsWithDiscount[productCode]; hasDiscount {
+			amount += calculateAmountWithDiscount(quantity, product.Price)
+			continue
+		}
+		amount += (product.Price * quantity)
+	}
+	return amount
+}
+
+func calculateRealProductUnits(checkoutProducts []string) map[string]int {
+	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
+	for _, checkoutProductCode := range checkoutProducts {
+		productUnits[checkoutProductCode] += 1
+	}
+	return productUnits
+}
+
+func calculatePayableProductUnits(productRealUnits map[string]int, productsWithPromotion map[string]models.Product) map[string]int {
+	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
+	for productCode, quantity := range productRealUnits {
+		if _, found := productsWithPromotion[productCode]; found {
+			productUnits[productCode] = calculatePayableUnitsApplying2X1Promotion(quantity)
+			continue
+		}
+		productUnits[productCode] = quantity
+	}
+	return productUnits
+}
+
+func calculatePayableUnitsApplying2X1Promotion(quantity int) int {
+	if quantity == 0 {
+		return 0
+	}
+	if quantity%2 == 0 {
+		return quantity / 2
+	}
+	return ((quantity - 1) / 2) + 1
+}
+
+func calculateAmountWithDiscount(quantity int, price int) int {
+	if quantity < 3 {
+		return price * quantity
+	}
+	unitPriceWithDiscount := (price * 75) / 100
+	return unitPriceWithDiscount * quantity
+}
+
+func formatCheckoutAmount(amount int) float64 {
+	return float64(amount) / 100
 }

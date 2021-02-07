@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"lana/flagship-store/models"
+	"lana/flagship-store/services/responses"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,9 +18,12 @@ var a App
 
 func TestMain(m *testing.M) {
 	var checkouts []models.Checkout
+	products := initialize_products()
+	productsWithPromotion := initialize_products_with_promotions()
+	productsWithDiscount := initialize_products_with_discount()
 
 	a = App{}
-	a.Initialize(checkouts)
+	a.Initialize(checkouts, products, productsWithPromotion, productsWithDiscount)
 
 	code := m.Run()
 
@@ -37,6 +41,56 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 
 func clearCheckouts() {
 	a.Checkouts = nil
+}
+
+func initialize_products() map[string]models.Product {
+	products := make(map[string]models.Product)
+
+	pen := models.Product{
+		Code:  "PEN",
+		Name:  "Lana Pen",
+		Price: 500,
+	}
+	tshirt := models.Product{
+		Code:  "TSHIRT",
+		Name:  "Lana T-Shirt",
+		Price: 2000,
+	}
+	mug := models.Product{
+		Code:  "MUG",
+		Name:  "Lana Coffee Mug",
+		Price: 750,
+	}
+
+	products[pen.Code] = pen
+	products[tshirt.Code] = tshirt
+	products[mug.Code] = mug
+	return products
+}
+
+func initialize_products_with_promotions() map[string]models.Product {
+	products := make(map[string]models.Product)
+
+	pen := models.Product{
+		Code:  "PEN",
+		Name:  "Lana Pen",
+		Price: 500,
+	}
+
+	products[pen.Code] = pen
+	return products
+}
+
+func initialize_products_with_discount() map[string]models.Product {
+	products := make(map[string]models.Product)
+
+	tshirt := models.Product{
+		Code:  "TSHIRT",
+		Name:  "Lana T-Shirt",
+		Price: 2000,
+	}
+	products[tshirt.Code] = tshirt
+	return products
 }
 
 func TestReturn200WhenCreateCheckout(t *testing.T) {
@@ -101,4 +155,127 @@ func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
 	modifiedCheckout := a.Checkouts[0]
 	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
 	assert.EqualValues(t, "PEN", modifiedCheckout.Products[1])
+}
+
+func TestReturn200WhenRetrieveCheckoutAmount(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"PEN"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	assert.EqualValues(t, 200, response.Code)
+}
+
+func TestAmountWhenCheckoutExists(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, 7.50, responseCheckout.Amount)
+}
+
+func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"PEN", "PEN"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(5), responseCheckout.Amount)
+}
+
+func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWithPromotion(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG", "MUG"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(15), responseCheckout.Amount)
+}
+
+func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"TSHIRT", "TSHIRT", "TSHIRT"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(45), responseCheckout.Amount)
+}
+
+func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithDiscount(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"TSHIRT", "TSHIRT"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(40), responseCheckout.Amount)
+}
+
+func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDiscount(t *testing.T) {
+	clearCheckouts()
+
+	checkout := models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG", "MUG", "MUG"},
+	}
+	a.Checkouts = append(a.Checkouts, checkout)
+
+	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
+	response := executeRequest(req)
+
+	var responseCheckout responses.Checkout
+	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
+
+	assert.EqualValues(t, float64(22.5), responseCheckout.Amount)
 }
