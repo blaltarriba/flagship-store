@@ -21,10 +21,10 @@ func TestMain(m *testing.M) {
 	checkoutRepository := initialize_checkout_repository()
 	productRepository := initialize_product_repository()
 	productsWithPromotionRepository := initialize_products_with_promotions()
-	productsWithDiscount := initialize_products_with_discount()
+	productsWithDiscountRepository := initialize_products_with_discount()
 
 	app = App{}
-	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscount)
+	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository)
 
 	code := m.Run()
 
@@ -88,7 +88,7 @@ func initialize_products_with_promotions() persistence.ProductRepository {
 	return persistence.NewProductWithPromotionRepository(products)
 }
 
-func initialize_products_with_discount() map[string]models.Product {
+func initialize_products_with_discount() persistence.ProductRepository {
 	products := make(map[string]models.Product)
 
 	tshirt := models.Product{
@@ -97,7 +97,7 @@ func initialize_products_with_discount() map[string]models.Product {
 		Price: 2000,
 	}
 	products[tshirt.Code] = tshirt
-	return products
+	return persistence.NewProductWithDiscountRepository(products)
 }
 
 func TestReturn200WhenCreateCheckout(t *testing.T) {

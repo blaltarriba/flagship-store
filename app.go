@@ -21,14 +21,14 @@ type App struct {
 	CheckoutRepository              persistence.CheckoutRepository
 	ProductRepository               persistence.ProductRepository
 	ProductsWithPromotionRepository persistence.ProductRepository
-	ProductsWithDiscount            map[string]models.Product
+	ProductsWithDiscountRepository  persistence.ProductRepository
 }
 
-func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscount map[string]models.Product) {
+func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository) {
 	app.CheckoutRepository = checkoutRepository
 	app.ProductRepository = productsRepository
 	app.ProductsWithPromotionRepository = productsWithPromotionRepository
-	app.ProductsWithDiscount = productsWithDiscount
+	app.ProductsWithDiscountRepository = productsWithDiscountRepository
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -117,7 +117,7 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 		return
 	}
 
-	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.ProductRepository, app.ProductsWithPromotionRepository, app.ProductsWithDiscount)
+	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.ProductRepository, app.ProductsWithPromotionRepository, app.ProductsWithDiscountRepository)
 	responseCheckout := responses.Checkout{
 		Amount: formatCheckoutAmount(checkoutAmount),
 	}
@@ -125,14 +125,14 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	json.NewEncoder(response).Encode(responseCheckout)
 }
 
-func calculateCheckoutAmount(checkoutProducts []string, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscount map[string]models.Product) int {
+func calculateCheckoutAmount(checkoutProducts []string, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository) int {
 	productRealUnits := calculateRealProductUnits(checkoutProducts)
 	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotionRepository)
 
 	var amount int
 	for productCode, quantity := range productUnits {
 		product, _ := productsRepository.SearchById(productCode)
-		if _, hasDiscount := productsWithDiscount[productCode]; hasDiscount {
+		if _, hasDiscount := productsWithDiscountRepository.SearchById(productCode); hasDiscount {
 			amount += calculateAmountWithDiscount(quantity, product.Price)
 			continue
 		}
