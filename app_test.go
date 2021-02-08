@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"lana/flagship-store/models"
 	"lana/flagship-store/persistence"
+	"lana/flagship-store/services"
 	"lana/flagship-store/services/responses"
 	"net/http"
 	"net/http/httptest"
@@ -22,9 +23,10 @@ func TestMain(m *testing.M) {
 	productRepository := initialize_product_repository()
 	productsWithPromotionRepository := initialize_products_with_promotions()
 	productsWithDiscountRepository := initialize_products_with_discount()
+	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
 
 	app = App{}
-	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository)
+	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService)
 
 	code := m.Run()
 
@@ -122,7 +124,6 @@ func TestCreateCheckout(t *testing.T) {
 	var createdCheckout models.Checkout
 	json.Unmarshal(response.Body.Bytes(), &createdCheckout)
 
-	assert.EqualValues(t, 1, app.CheckoutRepository.Count())
 	assert.NotNil(t, createdCheckout.Id)
 	assert.EqualValues(t, "PEN", createdCheckout.Products[0])
 	assert.EqualValues(t, 1, len(createdCheckout.Products))

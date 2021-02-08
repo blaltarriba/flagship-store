@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"lana/flagship-store/models"
 	"lana/flagship-store/persistence"
+	"lana/flagship-store/services"
 	"lana/flagship-store/services/commands"
+	"lana/flagship-store/services/errors"
 	"lana/flagship-store/services/responses"
 	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -22,13 +22,15 @@ type App struct {
 	ProductRepository               persistence.ProductRepository
 	ProductsWithPromotionRepository persistence.ProductRepository
 	ProductsWithDiscountRepository  persistence.ProductRepository
+	createCheckoutService           services.CreateCheckout
 }
 
-func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository) {
+func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout) {
 	app.CheckoutRepository = checkoutRepository
 	app.ProductRepository = productsRepository
 	app.ProductsWithPromotionRepository = productsWithPromotionRepository
 	app.ProductsWithDiscountRepository = productsWithDiscountRepository
+	app.createCheckoutService = createCheckoutService
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -50,7 +52,9 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
 
-	if _, existProduct := app.ProductRepository.SearchById(productCommand.Code); !existProduct {
+	checkout, err := app.createCheckoutService.Do(productCommand)
+
+	if _, ok := err.(*errors.ProductNotFoundError); ok {
 		response.WriteHeader(http.StatusNotFound)
 		productNotFound := responses.ProductNotFound{
 			Message: "Product " + productCommand.Code + " not found",
@@ -58,13 +62,6 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 		json.NewEncoder(response).Encode(productNotFound)
 		return
 	}
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{productCommand.Code},
-	}
-
-	app.CheckoutRepository.Persist(checkout)
 
 	response.WriteHeader(http.StatusCreated)
 	json.NewEncoder(response).Encode(checkout)
