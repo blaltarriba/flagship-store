@@ -3,11 +3,15 @@ package main
 import (
 	"lana/flagship-store/models"
 	"lana/flagship-store/persistence"
+	"lana/flagship-store/services"
 )
 
 func main() {
 	app := App{}
-	app.Initialize(populate_checkouts(), populate_products(), populate_products_with_promotion(), populate_products_with_discount())
+	checkoutRepository := populate_checkouts()
+	productRepository := populate_products()
+	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
+	app.Initialize(checkoutRepository, productRepository, populate_products_with_promotion(), populate_products_with_discount(), createCheckoutService)
 
 	app.Run(":10000")
 }
