@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"lana/flagship-store/models"
+	"lana/flagship-store/persistence"
 	"lana/flagship-store/services/commands"
 	"lana/flagship-store/services/responses"
 	"log"
@@ -18,14 +19,14 @@ import (
 type App struct {
 	Router                *mux.Router
 	Checkouts             map[string]models.Checkout
-	Products              map[string]models.Product
+	ProductRepository     persistence.ProductRepository
 	ProductsWithPromotion map[string]models.Product
 	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts map[string]models.Checkout, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
+func (app *App) Initialize(checkouts map[string]models.Checkout, productsRepository persistence.ProductRepository, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
 	app.Checkouts = checkouts
-	app.Products = products
+	app.ProductRepository = productsRepository
 	app.ProductsWithPromotion = productsWithPromotion
 	app.ProductsWithDiscount = productsWithDiscount
 	app.Router = mux.NewRouter().StrictSlash(true)
@@ -49,7 +50,7 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
 
-	if _, existProduct := app.Products[productCommand.Code]; !existProduct {
+	if _, existProduct := app.ProductRepository.SearchById(productCommand.Code); !existProduct {
 		response.WriteHeader(http.StatusNotFound)
 		productNotFound := responses.ProductNotFound{
 			Message: "Product " + productCommand.Code + " not found",
@@ -87,7 +88,7 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 		return
 	}
 
-	if _, existProduct := app.Products[addProductCommand.Code]; !existProduct {
+	if _, existProduct := app.ProductRepository.SearchById(addProductCommand.Code); !existProduct {
 		response.WriteHeader(http.StatusUnprocessableEntity)
 		productNotFound := responses.ProductNotFound{
 			Message: "Product " + addProductCommand.Code + " not found",
@@ -116,7 +117,7 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 		return
 	}
 
-	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.Products, app.ProductsWithPromotion, app.ProductsWithDiscount)
+	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.ProductRepository, app.ProductsWithPromotion, app.ProductsWithDiscount)
 	responseCheckout := responses.Checkout{
 		Amount: formatCheckoutAmount(checkoutAmount),
 	}
@@ -124,13 +125,13 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	json.NewEncoder(response).Encode(responseCheckout)
 }
 
-func calculateCheckoutAmount(checkoutProducts []string, products map[string]models.Product, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) int {
+func calculateCheckoutAmount(checkoutProducts []string, productsRepository persistence.ProductRepository, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) int {
 	productRealUnits := calculateRealProductUnits(checkoutProducts)
 	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotion)
 
 	var amount int
 	for productCode, quantity := range productUnits {
-		product := products[productCode]
+		product, _ := productsRepository.SearchById(productCode)
 		if _, hasDiscount := productsWithDiscount[productCode]; hasDiscount {
 			amount += calculateAmountWithDiscount(quantity, product.Price)
 			continue

@@ -2,6 +2,7 @@ package main
 
 import (
 	"lana/flagship-store/models"
+	"lana/flagship-store/persistence"
 )
 
 func main() {
@@ -12,7 +13,7 @@ func main() {
 	app.Run(":10000")
 }
 
-func populate_products(products map[string]models.Product) map[string]models.Product {
+func populate_products(products map[string]models.Product) persistence.ProductRepository {
 	products = make(map[string]models.Product)
 	pen := models.Product{
 		Code:  "PEN",
@@ -33,7 +34,7 @@ func populate_products(products map[string]models.Product) map[string]models.Pro
 	products[pen.Code] = pen
 	products[tshirt.Code] = tshirt
 	products[mug.Code] = mug
-	return products
+	return persistence.NewProductsRepository(products)
 }
 
 func populate_products_with_promotion(products map[string]models.Product) map[string]models.Product {

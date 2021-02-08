@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"lana/flagship-store/models"
+	"lana/flagship-store/persistence"
 	"lana/flagship-store/services/responses"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +44,7 @@ func clearCheckouts() {
 	app.Checkouts = make(map[string]models.Checkout)
 }
 
-func initialize_products() map[string]models.Product {
+func initialize_products() persistence.ProductRepository {
 	products := make(map[string]models.Product)
 
 	pen := models.Product{
@@ -65,7 +66,7 @@ func initialize_products() map[string]models.Product {
 	products[pen.Code] = pen
 	products[tshirt.Code] = tshirt
 	products[mug.Code] = mug
-	return products
+	return persistence.NewProductsRepository(products)
 }
 
 func initialize_products_with_promotions() map[string]models.Product {
