@@ -18,14 +18,14 @@ import (
 
 type App struct {
 	Router                *mux.Router
-	Checkouts             map[string]models.Checkout
+	CheckoutRepository    persistence.CheckoutRepository
 	ProductRepository     persistence.ProductRepository
 	ProductsWithPromotion map[string]models.Product
 	ProductsWithDiscount  map[string]models.Product
 }
 
-func (app *App) Initialize(checkouts map[string]models.Checkout, productsRepository persistence.ProductRepository, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
-	app.Checkouts = checkouts
+func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotion map[string]models.Product, productsWithDiscount map[string]models.Product) {
+	app.CheckoutRepository = checkoutRepository
 	app.ProductRepository = productsRepository
 	app.ProductsWithPromotion = productsWithPromotion
 	app.ProductsWithDiscount = productsWithDiscount
@@ -64,7 +64,7 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 		Products: []string{productCommand.Code},
 	}
 
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	response.WriteHeader(http.StatusCreated)
 	json.NewEncoder(response).Encode(checkout)
@@ -78,7 +78,7 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, existCheckout := app.Checkouts[id]
+	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
 	if !existCheckout {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
@@ -98,7 +98,7 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	}
 
 	checkout.Products = append(checkout.Products, addProductCommand.Code)
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	response.WriteHeader(http.StatusNoContent)
 }
@@ -107,7 +107,7 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, existCheckout := app.Checkouts[id]
+	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
 	if !existCheckout {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
@@ -189,7 +189,7 @@ func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Reque
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	_, existCheckout := app.Checkouts[id]
+	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
 	if !existCheckout {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
@@ -198,7 +198,8 @@ func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Reque
 		json.NewEncoder(response).Encode(checkoutNotFound)
 		return
 	}
-	delete(app.Checkouts, id)
+
+	app.CheckoutRepository.Delete(checkout)
 
 	response.WriteHeader(http.StatusNoContent)
 }
