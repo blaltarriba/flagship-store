@@ -7,18 +7,18 @@ import (
 
 func main() {
 	app := App{}
-	app.Initialize(populate_checkouts(checkouts), populate_products(products), populate_products_with_promotion(productsWithPromotion), populate_products_with_discount(productsWithDiscount))
+	app.Initialize(populate_checkouts(), populate_products(), populate_products_with_promotion(), populate_products_with_discount())
 
 	app.Run(":10000")
 }
 
-func populate_checkouts(checkouts map[string]models.Checkout) persistence.CheckoutRepository {
-	checkouts = make(map[string]models.Checkout)
+func populate_checkouts() persistence.CheckoutRepository {
+	checkouts := make(map[string]models.Checkout)
 	return persistence.NewCheckoutRepository(checkouts)
 }
 
-func populate_products(products map[string]models.Product) persistence.ProductRepository {
-	products = make(map[string]models.Product)
+func populate_products() persistence.ProductRepository {
+	products := make(map[string]models.Product)
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -41,29 +41,24 @@ func populate_products(products map[string]models.Product) persistence.ProductRe
 	return persistence.NewProductsRepository(products)
 }
 
-func populate_products_with_promotion(products map[string]models.Product) map[string]models.Product {
-	products = make(map[string]models.Product)
+func populate_products_with_promotion() persistence.ProductRepository {
+	products := make(map[string]models.Product)
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
 		Price: 500,
 	}
 	products[pen.Code] = pen
-	return products
+	return persistence.NewProductWithPromotionRepository(products)
 }
 
-func populate_products_with_discount(products map[string]models.Product) map[string]models.Product {
-	products = make(map[string]models.Product)
+func populate_products_with_discount() persistence.ProductRepository {
+	products := make(map[string]models.Product)
 	tshirt := models.Product{
 		Code:  "TSHIRT",
 		Name:  "Lana T-Shirt",
 		Price: 2000,
 	}
 	products[tshirt.Code] = tshirt
-	return products
+	return persistence.NewProductWithDiscountRepository(products)
 }
-
-var checkouts map[string]models.Checkout
-var products map[string]models.Product
-var productsWithPromotion map[string]models.Product
-var productsWithDiscount map[string]models.Product
