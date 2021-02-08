@@ -7,10 +7,14 @@ import (
 
 func main() {
 	app := App{}
-	checkouts = make(map[string]models.Checkout)
-	app.Initialize(checkouts, populate_products(products), populate_products_with_promotion(productsWithPromotion), populate_products_with_discount(productsWithDiscount))
+	app.Initialize(populate_checkouts(checkouts), populate_products(products), populate_products_with_promotion(productsWithPromotion), populate_products_with_discount(productsWithDiscount))
 
 	app.Run(":10000")
+}
+
+func populate_checkouts(checkouts map[string]models.Checkout) persistence.CheckoutRepository {
+	checkouts = make(map[string]models.Checkout)
+	return persistence.NewCheckoutRepository(checkouts)
 }
 
 func populate_products(products map[string]models.Product) persistence.ProductRepository {

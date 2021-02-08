@@ -18,13 +18,13 @@ import (
 var app App
 
 func TestMain(m *testing.M) {
-	var checkouts map[string]models.Checkout
-	products := initialize_products()
+	checkoutRepository := initialize_checkout_repository()
+	productRepository := initialize_product_repository()
 	productsWithPromotion := initialize_products_with_promotions()
 	productsWithDiscount := initialize_products_with_discount()
 
 	app = App{}
-	app.Initialize(checkouts, products, productsWithPromotion, productsWithDiscount)
+	app.Initialize(checkoutRepository, productRepository, productsWithPromotion, productsWithDiscount)
 
 	code := m.Run()
 
@@ -41,10 +41,16 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 }
 
 func clearCheckouts() {
-	app.Checkouts = make(map[string]models.Checkout)
+	checkouts := make(map[string]models.Checkout)
+	app.CheckoutRepository = persistence.NewCheckoutRepository(checkouts)
 }
 
-func initialize_products() persistence.ProductRepository {
+func initialize_checkout_repository() persistence.CheckoutRepository {
+	checkouts := make(map[string]models.Checkout)
+	return persistence.NewCheckoutRepository(checkouts)
+}
+
+func initialize_product_repository() persistence.ProductRepository {
 	products := make(map[string]models.Product)
 
 	pen := models.Product{
@@ -116,7 +122,7 @@ func TestCreateCheckout(t *testing.T) {
 	var createdCheckout models.Checkout
 	json.Unmarshal(response.Body.Bytes(), &createdCheckout)
 
-	assert.EqualValues(t, 1, len(app.Checkouts))
+	assert.EqualValues(t, 1, app.CheckoutRepository.Count())
 	assert.NotNil(t, createdCheckout.Id)
 	assert.EqualValues(t, "PEN", createdCheckout.Products[0])
 	assert.EqualValues(t, 1, len(createdCheckout.Products))
@@ -144,7 +150,7 @@ func TestReturn204AddingProductToCheckoutWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	payload := []byte(`{"product":"PEN"}`)
 
@@ -161,14 +167,14 @@ func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	payload := []byte(`{"product":"PEN"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
 	executeRequest(req)
 
-	modifiedCheckout, _ := app.Checkouts[checkout.Id]
+	modifiedCheckout, _ := app.CheckoutRepository.SearchById(checkout.Id)
 	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
 	assert.EqualValues(t, "PEN", modifiedCheckout.Products[1])
 }
@@ -195,7 +201,7 @@ func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) 
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	payload := []byte(`{"product":"FAKE"}`)
 
@@ -216,7 +222,7 @@ func TestReturn200RetrievingCheckoutAmountWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"PEN"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -231,7 +237,7 @@ func TestAmountWhenCheckoutExists(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -262,7 +268,7 @@ func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion
 		Id:       uuid.NewString(),
 		Products: []string{"PEN", "PEN"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -280,7 +286,7 @@ func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWith
 		Id:       uuid.NewString(),
 		Products: []string{"MUG", "MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -298,7 +304,7 @@ func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t 
 		Id:       uuid.NewString(),
 		Products: []string{"TSHIRT", "TSHIRT", "TSHIRT"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -316,7 +322,7 @@ func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithD
 		Id:       uuid.NewString(),
 		Products: []string{"TSHIRT", "TSHIRT"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -334,7 +340,7 @@ func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDi
 		Id:       uuid.NewString(),
 		Products: []string{"MUG", "MUG", "MUG"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
@@ -352,7 +358,7 @@ func TestReturn204WhenDeleteCheckout(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"PEN"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("DELETE", "/checkouts/"+checkout.Id, nil)
 	response := executeRequest(req)
@@ -367,12 +373,12 @@ func TestDeleteCheckout(t *testing.T) {
 		Id:       uuid.NewString(),
 		Products: []string{"PEN"},
 	}
-	app.Checkouts[checkout.Id] = checkout
+	app.CheckoutRepository.Persist(checkout)
 
 	req, _ := http.NewRequest("DELETE", "/checkouts/"+checkout.Id, nil)
 	executeRequest(req)
 
-	assert.EqualValues(t, 0, len(app.Checkouts))
+	assert.EqualValues(t, 0, app.CheckoutRepository.Count())
 }
 
 func TestReturn404DeletingCheckoutWhenCheckoutDoesNotExists(t *testing.T) {

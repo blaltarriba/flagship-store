@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestReturnProductWhenProductExists(t *testing.T) {
+func TestSearchByIdReturnProductWhenProductExists(t *testing.T) {
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -23,7 +23,7 @@ func TestReturnProductWhenProductExists(t *testing.T) {
 	assert.EqualValues(t, pen, product)
 }
 
-func TestReturnEmptyProductWhenProductDoesNotExist(t *testing.T) {
+func TestSearchByIdReturnEmptyProductWhenProductDoesNotExist(t *testing.T) {
 	products := make(map[string]models.Product)
 	inMemoryProductsRepository := &InMemoryProductsRepository{products}
 
