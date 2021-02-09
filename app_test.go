@@ -106,19 +106,11 @@ func initialize_products_with_discount() persistence.ProductRepository {
 }
 
 func TestReturn200WhenCreateCheckout(t *testing.T) {
-	clearCheckouts()
-
-	payload := []byte(`{"product-code":"PEN"}`)
-
-	req, _ := http.NewRequest("POST", "/checkouts", bytes.NewBuffer(payload))
-	response := executeRequest(req)
-
-	assert.EqualValues(t, 201, response.Code)
-}
-
-func TestCreateCheckout(t *testing.T) {
-	clearCheckouts()
-
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, true)
+	app.CreateCheckoutService = services.NewCreateCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
 	payload := []byte(`{"product-code":"PEN"}`)
 
 	req, _ := http.NewRequest("POST", "/checkouts", bytes.NewBuffer(payload))
@@ -126,15 +118,19 @@ func TestCreateCheckout(t *testing.T) {
 
 	var createdCheckout models.Checkout
 	json.Unmarshal(response.Body.Bytes(), &createdCheckout)
-
+	assert.EqualValues(t, 201, response.Code)
 	assert.NotNil(t, createdCheckout.Id)
 	assert.EqualValues(t, "PEN", createdCheckout.Products[0])
 	assert.EqualValues(t, 1, len(createdCheckout.Products))
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
-	clearCheckouts()
-
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "FAKE").Return(models.Product{}, false)
+	app.CreateCheckoutService = services.NewCreateCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
 	payload := []byte(`{"product-code":"FAKE"}`)
 
 	req, _ := http.NewRequest("POST", "/checkouts", bytes.NewBuffer(payload))
@@ -144,6 +140,8 @@ func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
 	json.Unmarshal(response.Body.Bytes(), &productNotFound)
 	assert.EqualValues(t, 404, response.Code)
 	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn204AddingProductToCheckoutWhenCheckoutExists(t *testing.T) {
