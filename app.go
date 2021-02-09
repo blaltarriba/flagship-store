@@ -22,15 +22,17 @@ type App struct {
 	ProductRepository               persistence.ProductRepository
 	ProductsWithPromotionRepository persistence.ProductRepository
 	ProductsWithDiscountRepository  persistence.ProductRepository
-	createCheckoutService           services.CreateCheckout
+	CreateCheckoutService           services.CreateCheckout
+	AddProductToCheckoutService     services.AddProductToCheckout
 }
 
-func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout) {
+func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout, addProductToCheckoutService services.AddProductToCheckout) {
 	app.CheckoutRepository = checkoutRepository
 	app.ProductRepository = productsRepository
 	app.ProductsWithPromotionRepository = productsWithPromotionRepository
 	app.ProductsWithDiscountRepository = productsWithDiscountRepository
-	app.createCheckoutService = createCheckoutService
+	app.CreateCheckoutService = createCheckoutService
+	app.AddProductToCheckoutService = addProductToCheckoutService
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -52,7 +54,7 @@ func (app *App) createCheckout(response http.ResponseWriter, request *http.Reque
 	var productCommand commands.Product
 	json.Unmarshal(body, &productCommand)
 
-	checkout, err := app.createCheckoutService.Do(productCommand)
+	checkout, err := app.CreateCheckoutService.Do(productCommand)
 
 	if _, ok := err.(*errors.ProductNotFoundError); ok {
 		response.WriteHeader(http.StatusNotFound)
@@ -75,8 +77,9 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
-	if !existCheckout {
+	_, err := app.AddProductToCheckoutService.Do(addProductCommand, id)
+
+	if _, isThisError := err.(*errors.CheckoutNotFoundError); isThisError {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
 			Message: "Checkout " + id + " not found",
@@ -85,7 +88,7 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 		return
 	}
 
-	if _, existProduct := app.ProductRepository.SearchById(addProductCommand.Code); !existProduct {
+	if _, isThisError := err.(*errors.ProductNotFoundError); isThisError {
 		response.WriteHeader(http.StatusUnprocessableEntity)
 		productNotFound := responses.ProductNotFound{
 			Message: "Product " + addProductCommand.Code + " not found",
@@ -93,9 +96,6 @@ func (app *App) addProductToCheckout(response http.ResponseWriter, request *http
 		json.NewEncoder(response).Encode(productNotFound)
 		return
 	}
-
-	checkout.Products = append(checkout.Products, addProductCommand.Code)
-	app.CheckoutRepository.Persist(checkout)
 
 	response.WriteHeader(http.StatusNoContent)
 }

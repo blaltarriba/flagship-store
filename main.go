@@ -11,9 +11,10 @@ func main() {
 	checkoutRepository := populate_checkouts()
 	productRepository := populate_products()
 	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
-	app.Initialize(checkoutRepository, productRepository, populate_products_with_promotion(), populate_products_with_discount(), createCheckoutService)
+	addProductToCheckoutService := services.NewAddProductToCheckout(checkoutRepository, productRepository)
+	app.Initialize(checkoutRepository, productRepository, populate_products_with_promotion(), populate_products_with_discount(), createCheckoutService, addProductToCheckoutService)
 
-	app.Run(":10000")
+	app.Run(":3080")
 }
 
 func populate_checkouts() persistence.CheckoutRepository {

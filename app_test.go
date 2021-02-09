@@ -7,6 +7,7 @@ import (
 	"lana/flagship-store/persistence"
 	"lana/flagship-store/services"
 	"lana/flagship-store/services/responses"
+	"lana/flagship-store/utils/mocks"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var app App
@@ -24,9 +26,10 @@ func TestMain(m *testing.M) {
 	productsWithPromotionRepository := initialize_products_with_promotions()
 	productsWithDiscountRepository := initialize_products_with_discount()
 	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
+	addProductToCheckoutService := services.NewAddProductToCheckout(checkoutRepository, productRepository)
 
 	app = App{}
-	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService)
+	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService, addProductToCheckoutService)
 
 	code := m.Run()
 
@@ -139,50 +142,35 @@ func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
 
 	var productNotFound responses.ProductNotFound
 	json.Unmarshal(response.Body.Bytes(), &productNotFound)
-
 	assert.EqualValues(t, 404, response.Code)
 	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
 }
 
 func TestReturn204AddingProductToCheckoutWhenCheckoutExists(t *testing.T) {
-	clearCheckouts()
-
 	checkout := models.Checkout{
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.CheckoutRepository.Persist(checkout)
-
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
+	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, true)
+	app.AddProductToCheckoutService = services.NewAddProductToCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
 	payload := []byte(`{"product":"PEN"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
 	response := executeRequest(req)
-
 	assert.EqualValues(t, 204, response.Code)
-}
-
-func TestAddProductToCheckoutWhenCheckoutExists(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	payload := []byte(`{"product":"PEN"}`)
-
-	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
-	executeRequest(req)
-
-	modifiedCheckout, _ := app.CheckoutRepository.SearchById(checkout.Id)
-	assert.EqualValues(t, 2, len(modifiedCheckout.Products))
-	assert.EqualValues(t, "PEN", modifiedCheckout.Products[1])
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn404AddingProductToCheckoutWhenCheckoutDoesNotExists(t *testing.T) {
-	clearCheckouts()
-
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", mock.AnythingOfType("string")).Return(models.Checkout{}, false)
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	app.AddProductToCheckoutService = services.NewAddProductToCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
 	payload := []byte(`{"product":"PEN"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/a_fake_checkout", bytes.NewBuffer(payload))
@@ -190,20 +178,22 @@ func TestReturn404AddingProductToCheckoutWhenCheckoutDoesNotExists(t *testing.T)
 
 	var checkoutNotFound responses.CheckoutNotFound
 	json.Unmarshal(response.Body.Bytes(), &checkoutNotFound)
-
 	assert.EqualValues(t, 404, response.Code)
 	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) {
-	clearCheckouts()
-
 	checkout := models.Checkout{
 		Id:       uuid.NewString(),
 		Products: []string{"MUG"},
 	}
-	app.CheckoutRepository.Persist(checkout)
-
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "FAKE").Return(models.Product{}, false)
+	app.AddProductToCheckoutService = services.NewAddProductToCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
 	payload := []byte(`{"product":"FAKE"}`)
 
 	req, _ := http.NewRequest("PATCH", "/checkouts/"+checkout.Id, bytes.NewBuffer(payload))
@@ -211,9 +201,10 @@ func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) 
 
 	var productNotFound responses.ProductNotFound
 	json.Unmarshal(response.Body.Bytes(), &productNotFound)
-
 	assert.EqualValues(t, 422, response.Code)
 	assert.EqualValues(t, "Product FAKE not found", productNotFound.Message)
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn200RetrievingCheckoutAmountWhenCheckoutExists(t *testing.T) {
