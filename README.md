@@ -7,6 +7,10 @@ Project to resolve Lana store challenge.
 
 To install the project run:
 
+    make install
+
+To build the project run:
+
     make build
 
 To run the container run:
