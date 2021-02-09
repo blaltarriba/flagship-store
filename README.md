@@ -5,6 +5,23 @@ Project to resolve Lana store challenge.
 
 ## Installation
 
+To install the project run:
+
+    make build
+
+To run the container run:
+
+    make env-start
+
+then the API will be ready at `http://localhost:3080/`
+
+
+## Testing
+
+To execute test run:
+
+    make test
+
 
 ## Operations
 
@@ -12,7 +29,7 @@ Project to resolve Lana store challenge.
 
 To create a new checkout basket, in terminal execute:
 
-    curl -w "%{http_code}" --location --request POST 'http://localhost:10000/checkouts' \
+    curl -w "%{http_code}" --location --request POST 'http://localhost:3080/checkouts' \
     --header 'Content-Type: application/json' \
     --data-raw '{
         "product-code": "PEN"
@@ -33,7 +50,7 @@ Possible responses:
 
 To add a product to a basket, in terminal execute:
 
-    curl -w "%{http_code}" --location --request PATCH 'http://localhost:10000/checkouts/45120489-458f-4567-9d7a-c0d83b55128e' \
+    curl -w "%{http_code}" --location --request PATCH 'http://localhost:3080/checkouts/45120489-458f-4567-9d7a-c0d83b55128e' \
     --header 'Content-Type: application/json' \
     --data-raw '{
         "product": "TSHIRT"
@@ -59,7 +76,7 @@ Possible responses:
 
 To get the total amount in a basket, in terminal execute:
 
-    curl -w "%{http_code}" --location --request GET 'http://localhost:10000/checkouts/45120489-458f-4567-9d7a-c0d83b55128e/amount'
+    curl -w "%{http_code}" --location --request GET 'http://localhost:3080/checkouts/45120489-458f-4567-9d7a-c0d83b55128e/amount'
 
 Possible responses:
 - Success: Code 200 with body
@@ -78,7 +95,7 @@ Possible responses:
 
 To remove the basket, in terminal execute:
 
-    curl -w "%{http_code}" --location --request DELETE 'http://localhost:10000/checkouts/45120489-458f-4567-9d7a-c0d83b55128e'
+    curl -w "%{http_code}" --location --request DELETE 'http://localhost:3080/checkouts/45120489-458f-4567-9d7a-c0d83b55128e'
 
 Possible responses:
 - Success: Code 204
