@@ -14,10 +14,8 @@ import (
 func TestCreateCheckout(t *testing.T) {
 	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
 	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
-
 	theProductRepositoryMock := mocks.ProductRepositoryMock{}
 	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, true)
-
 	productCommand := commands.Product{Code: "PEN"}
 	createCheckout := CreateCheckout{&theCheckoutRepositoryMock, &theProductRepositoryMock}
 
@@ -32,11 +30,8 @@ func TestCreateCheckout(t *testing.T) {
 
 func TestReturnProductNotFoundErrorWhenProductDoesnotExists(t *testing.T) {
 	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
-	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
-
 	theProductRepositoryMock := mocks.ProductRepositoryMock{}
 	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, false)
-
 	productCommand := commands.Product{Code: "PEN"}
 	createCheckout := CreateCheckout{&theCheckoutRepositoryMock, &theProductRepositoryMock}
 
@@ -44,5 +39,4 @@ func TestReturnProductNotFoundErrorWhenProductDoesnotExists(t *testing.T) {
 
 	_, isProductNotFoundError := err.(*errors.ProductNotFoundError)
 	assert.EqualValues(t, true, isProductNotFoundError)
-	theCheckoutRepositoryMock.AssertNumberOfCalls(t, "Persist", 0)
 }

@@ -10,7 +10,7 @@ build: ## Build project
 	docker build -t flagship-store .
 
 env-start: ## Start project container
-	docker run --rm -it -p 3080:10000 flagship-store
+	docker run --rm -it -p 3080:3080 flagship-store
 
 test:
 	go test ./... -v
