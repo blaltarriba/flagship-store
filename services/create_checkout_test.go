@@ -2,72 +2,79 @@ package services
 
 import (
 	"lana/flagship-store/models"
-	"lana/flagship-store/persistence"
 	"lana/flagship-store/services/commands"
 	"lana/flagship-store/services/errors"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-var createCheckout CreateCheckout
-
-func TestMain(m *testing.M) {
-	checkoutRepository := initialize_checkout_repository()
-	productRepository := initialize_product_repository()
-
-	createCheckout = NewCreateCheckout(checkoutRepository, productRepository)
-
-	code := m.Run()
-
-	clearCheckouts()
-
-	os.Exit(code)
+type checkoutRepositoryMock struct {
+	mock.Mock
 }
 
-func clearCheckouts() {
-	checkouts := make(map[string]models.Checkout)
-	createCheckout.CheckoutRepository = persistence.NewCheckoutRepository(checkouts)
+func (repository *checkoutRepositoryMock) SearchById(id string) (models.Checkout, bool) {
+	args := repository.Called(id)
+	return args.Get(0).(models.Checkout), args.Bool(1)
 }
 
-func initialize_checkout_repository() persistence.CheckoutRepository {
-	checkouts := make(map[string]models.Checkout)
-	return persistence.NewCheckoutRepository(checkouts)
+func (repository *checkoutRepositoryMock) Persist(checkout models.Checkout) {
+	repository.Called(checkout)
+	return
 }
 
-func initialize_product_repository() persistence.ProductRepository {
-	products := make(map[string]models.Product)
+func (repository *checkoutRepositoryMock) Delete(checkout models.Checkout) {
+	repository.Called(checkout)
+	return
+}
 
-	pen := models.Product{
-		Code:  "PEN",
-		Name:  "Lana Pen",
-		Price: 500,
-	}
+func (repository *checkoutRepositoryMock) Count() int {
+	args := repository.Called()
+	return args.Int(0)
+}
 
-	products[pen.Code] = pen
-	return persistence.NewProductsRepository(products)
+type productRepositoryMock struct {
+	mock.Mock
+}
+
+func (repository *productRepositoryMock) SearchById(id string) (models.Product, bool) {
+	args := repository.Called(id)
+	return args.Get(0).(models.Product), args.Bool(1)
 }
 
 func TestCreateCheckout(t *testing.T) {
-	clearCheckouts()
+	theCheckoutRepositoryMock := checkoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
+
+	theProductRepositoryMock := productRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, true)
 
 	productCommand := commands.Product{Code: "PEN"}
+	createCheckout := CreateCheckout{&theCheckoutRepositoryMock, &theProductRepositoryMock}
 
 	createdCheckout, _ := createCheckout.Do(productCommand)
 
 	assert.NotNil(t, createdCheckout.Id)
 	assert.EqualValues(t, "PEN", createdCheckout.Products[0])
 	assert.EqualValues(t, 1, len(createdCheckout.Products))
+	theCheckoutRepositoryMock.AssertNumberOfCalls(t, "Persist", 1)
+	theCheckoutRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturnProductNotFoundErrorWhenProductDoesnotExists(t *testing.T) {
-	clearCheckouts()
+	theCheckoutRepositoryMock := checkoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
 
-	productCommand := commands.Product{Code: "FAKE"}
+	theProductRepositoryMock := productRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", "PEN").Return(models.Product{}, false)
+
+	productCommand := commands.Product{Code: "PEN"}
+	createCheckout := CreateCheckout{&theCheckoutRepositoryMock, &theProductRepositoryMock}
 
 	_, err := createCheckout.Do(productCommand)
 
 	_, isProductNotFoundError := err.(*errors.ProductNotFoundError)
 	assert.EqualValues(t, true, isProductNotFoundError)
+	theCheckoutRepositoryMock.AssertNumberOfCalls(t, "Persist", 0)
 }
