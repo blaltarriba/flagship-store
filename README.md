@@ -33,11 +33,17 @@ then the API will be ready at `http://localhost:3080/`
         └-- mocks
 
 _models_: Domain objects classes.
+
 _persistence_: Repository classes and interfaces to deal with our persistence system(local array, database or whatever)
+
 _services_: Services for each action that can be executed.
+
 _services/commands_: Objects used as a parameters of services.
+
 _services/errors_: Services response errors.
+
 _services/responses_: Application response based on service response. Used at controller layer.
+
 _utils/mocks_: Services mocks used for testing.
 
 ## Testing
