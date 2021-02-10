@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"lana/flagship-store/persistence"
 	"lana/flagship-store/services"
 	"lana/flagship-store/services/commands"
 	"lana/flagship-store/services/errors"
@@ -17,23 +16,17 @@ import (
 )
 
 type App struct {
-	Router                          *mux.Router
-	CheckoutRepository              persistence.CheckoutRepository
-	ProductRepository               persistence.ProductRepository
-	ProductsWithPromotionRepository persistence.ProductRepository
-	ProductsWithDiscountRepository  persistence.ProductRepository
-	CreateCheckoutService           services.CreateCheckout
-	AddProductToCheckoutService     services.AddProductToCheckout
-	DeleteCheckoutService           services.DeleteCheckout
+	Router                        *mux.Router
+	CreateCheckoutService         services.CreateCheckout
+	AddProductToCheckoutService   services.AddProductToCheckout
+	RetrieveCheckoutAmountService services.RetrieveCheckoutAmount
+	DeleteCheckoutService         services.DeleteCheckout
 }
 
-func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout, addProductToCheckoutService services.AddProductToCheckout, deleteCheckoutService services.DeleteCheckout) {
-	app.CheckoutRepository = checkoutRepository
-	app.ProductRepository = productsRepository
-	app.ProductsWithPromotionRepository = productsWithPromotionRepository
-	app.ProductsWithDiscountRepository = productsWithDiscountRepository
+func (app *App) Initialize(createCheckoutService services.CreateCheckout, addProductToCheckoutService services.AddProductToCheckout, deleteCheckoutService services.DeleteCheckout, retrieveCheckoutAmountService services.RetrieveCheckoutAmount) {
 	app.CreateCheckoutService = createCheckoutService
 	app.AddProductToCheckoutService = addProductToCheckoutService
+	app.RetrieveCheckoutAmountService = retrieveCheckoutAmountService
 	app.DeleteCheckoutService = deleteCheckoutService
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
@@ -106,8 +99,9 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
-	if !existCheckout {
+	amount, err := app.RetrieveCheckoutAmountService.Do(id)
+
+	if _, ok := err.(*errors.CheckoutNotFoundError); ok {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
 			Message: "Checkout " + id + " not found",
@@ -116,66 +110,11 @@ func (app *App) retrieveCheckoutAmount(response http.ResponseWriter, request *ht
 		return
 	}
 
-	checkoutAmount := calculateCheckoutAmount(checkout.Products, app.ProductRepository, app.ProductsWithPromotionRepository, app.ProductsWithDiscountRepository)
 	responseCheckout := responses.Checkout{
-		Amount: formatCheckoutAmount(checkoutAmount),
+		Amount: formatCheckoutAmount(amount),
 	}
 	response.WriteHeader(http.StatusOK)
 	json.NewEncoder(response).Encode(responseCheckout)
-}
-
-func calculateCheckoutAmount(checkoutProducts []string, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository) int {
-	productRealUnits := calculateRealProductUnits(checkoutProducts)
-	productUnits := calculatePayableProductUnits(productRealUnits, productsWithPromotionRepository)
-
-	var amount int
-	for productCode, quantity := range productUnits {
-		product, _ := productsRepository.SearchById(productCode)
-		if _, hasDiscount := productsWithDiscountRepository.SearchById(productCode); hasDiscount {
-			amount += calculateAmountWithDiscount(quantity, product.Price)
-			continue
-		}
-		amount += (product.Price * quantity)
-	}
-	return amount
-}
-
-func calculateRealProductUnits(checkoutProducts []string) map[string]int {
-	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
-	for _, checkoutProductCode := range checkoutProducts {
-		productUnits[checkoutProductCode] += 1
-	}
-	return productUnits
-}
-
-func calculatePayableProductUnits(productRealUnits map[string]int, productsWithPromotionRepository persistence.ProductRepository) map[string]int {
-	var productUnits = map[string]int{"PEN": 0, "TSHIRT": 0, "MUG": 0}
-	for productCode, quantity := range productRealUnits {
-		if _, found := productsWithPromotionRepository.SearchById(productCode); found {
-			productUnits[productCode] = calculatePayableUnitsApplying2X1Promotion(quantity)
-			continue
-		}
-		productUnits[productCode] = quantity
-	}
-	return productUnits
-}
-
-func calculatePayableUnitsApplying2X1Promotion(quantity int) int {
-	if quantity == 0 {
-		return 0
-	}
-	if quantity%2 == 0 {
-		return quantity / 2
-	}
-	return ((quantity - 1) / 2) + 1
-}
-
-func calculateAmountWithDiscount(quantity int, price int) int {
-	if quantity < 3 {
-		return price * quantity
-	}
-	unitPriceWithDiscount := (price * 75) / 100
-	return unitPriceWithDiscount * quantity
 }
 
 func formatCheckoutAmount(amount int) string {

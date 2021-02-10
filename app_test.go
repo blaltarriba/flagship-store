@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"lana/flagship-store/models"
-	"lana/flagship-store/persistence"
 	"lana/flagship-store/services"
 	"lana/flagship-store/services/responses"
 	"lana/flagship-store/utils/mocks"
@@ -21,20 +20,19 @@ import (
 var app App
 
 func TestMain(m *testing.M) {
-	checkoutRepository := initialize_checkout_repository()
-	productRepository := initialize_product_repository()
-	productsWithPromotionRepository := initialize_products_with_promotions()
-	productsWithDiscountRepository := initialize_products_with_discount()
-	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
-	addProductToCheckoutService := services.NewAddProductToCheckout(checkoutRepository, productRepository)
-	deleteCheckoutService := services.NewDeleteCheckout(checkoutRepository)
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductWithDiscountRepositoryMock := mocks.ProductWithDiscountRepositoryMock{}
+	theProductWithPromotionRepositoryMock := mocks.ProductWithPromotionRepositoryMock{}
+	createCheckoutService := services.NewCreateCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
+	addProductToCheckoutService := services.NewAddProductToCheckout(&theCheckoutRepositoryMock, &theProductRepositoryMock)
+	retrieveCheckoutAmountService := services.NewRetrieveCheckoutAmount(&theCheckoutRepositoryMock, &theProductRepositoryMock, &theProductWithDiscountRepositoryMock, &theProductWithPromotionRepositoryMock)
+	deleteCheckoutService := services.NewDeleteCheckout(&theCheckoutRepositoryMock)
 
 	app = App{}
-	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService, addProductToCheckoutService, deleteCheckoutService)
+	app.Initialize(createCheckoutService, addProductToCheckoutService, deleteCheckoutService, retrieveCheckoutAmountService)
 
 	code := m.Run()
-
-	clearCheckouts()
 
 	os.Exit(code)
 }
@@ -46,19 +44,14 @@ func executeRequest(req *http.Request) *httptest.ResponseRecorder {
 	return rr
 }
 
-func clearCheckouts() {
-	checkouts := make(map[string]models.Checkout)
-	app.CheckoutRepository = persistence.NewCheckoutRepository(checkouts)
+func ACheckout() models.Checkout {
+	return models.Checkout{
+		Id:       uuid.NewString(),
+		Products: []string{"MUG"},
+	}
 }
 
-func initialize_checkout_repository() persistence.CheckoutRepository {
-	checkouts := make(map[string]models.Checkout)
-	return persistence.NewCheckoutRepository(checkouts)
-}
-
-func initialize_product_repository() persistence.ProductRepository {
-	products := make(map[string]models.Product)
-
+func ProductRepositoryMockWithAllProducts() mocks.ProductRepositoryMock {
 	pen := models.Product{
 		Code:  "PEN",
 		Name:  "Lana Pen",
@@ -74,36 +67,12 @@ func initialize_product_repository() persistence.ProductRepository {
 		Name:  "Lana Coffee Mug",
 		Price: 750,
 	}
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductRepositoryMock.On("SearchById", pen.Code).Return(pen, true)
+	theProductRepositoryMock.On("SearchById", mug.Code).Return(mug, true)
+	theProductRepositoryMock.On("SearchById", tshirt.Code).Return(tshirt, true)
 
-	products[pen.Code] = pen
-	products[tshirt.Code] = tshirt
-	products[mug.Code] = mug
-	return persistence.NewProductsRepository(products)
-}
-
-func initialize_products_with_promotions() persistence.ProductRepository {
-	products := make(map[string]models.Product)
-
-	pen := models.Product{
-		Code:  "PEN",
-		Name:  "Lana Pen",
-		Price: 500,
-	}
-
-	products[pen.Code] = pen
-	return persistence.NewProductWithPromotionRepository(products)
-}
-
-func initialize_products_with_discount() persistence.ProductRepository {
-	products := make(map[string]models.Product)
-
-	tshirt := models.Product{
-		Code:  "TSHIRT",
-		Name:  "Lana T-Shirt",
-		Price: 2000,
-	}
-	products[tshirt.Code] = tshirt
-	return persistence.NewProductWithDiscountRepository(products)
+	return theProductRepositoryMock
 }
 
 func TestReturn200WhenCreateCheckout(t *testing.T) {
@@ -146,10 +115,7 @@ func TestReturn404WhenCreateCheckoutWithNotValidProduct(t *testing.T) {
 }
 
 func TestReturn204AddingProductToCheckoutWhenCheckoutExists(t *testing.T) {
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG"},
-	}
+	checkout := ACheckout()
 	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
 	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
 	theCheckoutRepositoryMock.On("Persist", mock.AnythingOfType("models.Checkout"))
@@ -184,10 +150,7 @@ func TestReturn404AddingProductToCheckoutWhenCheckoutDoesNotExists(t *testing.T)
 }
 
 func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) {
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG"},
-	}
+	checkout := ACheckout()
 	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
 	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
 	theProductRepositoryMock := mocks.ProductRepositoryMock{}
@@ -207,40 +170,44 @@ func TestReturn422AddingProductToCheckoutWhenProductDoesNotExists(t *testing.T) 
 }
 
 func TestReturn200RetrievingCheckoutAmountWhenCheckoutExists(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"PEN"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	assert.EqualValues(t, 200, response.Code)
-}
-
-func TestAmountWhenCheckoutExists(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG"},
-	}
-	app.CheckoutRepository.Persist(checkout)
+	checkout := ACheckout()
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
+	theProductRepositoryMock := ProductRepositoryMockWithAllProducts()
+	theProductWithDiscountRepositoryMock := mocks.ProductWithDiscountRepositoryMock{}
+	theProductWithDiscountRepositoryMock.On("SearchById", mock.AnythingOfType("string")).Return(models.Product{}, false)
+	theProductWithPromotionRepositoryMock := mocks.ProductWithPromotionRepositoryMock{}
+	theProductWithPromotionRepositoryMock.On("SearchById", mock.AnythingOfType("string")).Return(models.Product{}, false)
+	app.RetrieveCheckoutAmountService = services.NewRetrieveCheckoutAmount(
+		&theCheckoutRepositoryMock,
+		&theProductRepositoryMock,
+		&theProductWithPromotionRepositoryMock,
+		&theProductWithDiscountRepositoryMock)
 
 	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
 	response := executeRequest(req)
 
 	var responseCheckout responses.Checkout
 	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
+	assert.EqualValues(t, 200, response.Code)
 	assert.EqualValues(t, "7.50€", responseCheckout.Amount)
+	theCheckoutRepositoryMock.AssertExpectations(t)
+	theProductRepositoryMock.AssertExpectations(t)
+	theProductWithDiscountRepositoryMock.AssertExpectations(t)
+	theProductWithPromotionRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn404RetrievingCheckoutAmountWhenCheckoutDoesNotExists(t *testing.T) {
-	clearCheckouts()
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", "a_fake_checkout").Return(models.Checkout{}, false)
+	theProductRepositoryMock := mocks.ProductRepositoryMock{}
+	theProductWithDiscountRepositoryMock := mocks.ProductWithDiscountRepositoryMock{}
+	theProductWithPromotionRepositoryMock := mocks.ProductWithPromotionRepositoryMock{}
+	app.RetrieveCheckoutAmountService = services.NewRetrieveCheckoutAmount(
+		&theCheckoutRepositoryMock,
+		&theProductRepositoryMock,
+		&theProductWithPromotionRepositoryMock,
+		&theProductWithDiscountRepositoryMock)
 
 	req, _ := http.NewRequest("GET", "/checkouts/a_fake_checkout/amount", nil)
 	response := executeRequest(req)
@@ -250,103 +217,11 @@ func TestReturn404RetrievingCheckoutAmountWhenCheckoutDoesNotExists(t *testing.T
 
 	assert.EqualValues(t, 404, response.Code)
 	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
-}
-
-func TestAmountWith2X1PromotionWhenCheckoutContainsTwoOfSameProductWithPromotion(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"PEN", "PEN"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	var responseCheckout responses.Checkout
-	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
-	assert.EqualValues(t, "5.00€", responseCheckout.Amount)
-}
-
-func TestAmountWithNo2X1PromotionWhenCheckoutDoesNotContainsTwoOfSameProductWithPromotion(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG", "MUG"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	var responseCheckout responses.Checkout
-	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
-	assert.EqualValues(t, "15.00€", responseCheckout.Amount)
-}
-
-func TestAmountWithDiscountWhenCheckoutContainsThreeOfSameProductWithDiscount(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"TSHIRT", "TSHIRT", "TSHIRT"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	var responseCheckout responses.Checkout
-	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
-	assert.EqualValues(t, "45.00€", responseCheckout.Amount)
-}
-
-func TestAmountWithNoDiscountWhenCheckoutContainsLessThanThreeOfSameProductWithDiscount(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"TSHIRT", "TSHIRT"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	var responseCheckout responses.Checkout
-	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
-	assert.EqualValues(t, "40.00€", responseCheckout.Amount)
-}
-
-func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDiscount(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"MUG", "MUG", "MUG"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("GET", "/checkouts/"+checkout.Id+"/amount", nil)
-	response := executeRequest(req)
-
-	var responseCheckout responses.Checkout
-	json.Unmarshal(response.Body.Bytes(), &responseCheckout)
-
-	assert.EqualValues(t, "22.50€", responseCheckout.Amount)
+	theCheckoutRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn204WhenDeleteCheckout(t *testing.T) {
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"PEN"},
-	}
+	checkout := ACheckout()
 	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
 	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
 	theCheckoutRepositoryMock.On("Delete", checkout)
