@@ -12,7 +12,8 @@ func main() {
 	productRepository := populate_products()
 	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
 	addProductToCheckoutService := services.NewAddProductToCheckout(checkoutRepository, productRepository)
-	app.Initialize(checkoutRepository, productRepository, populate_products_with_promotion(), populate_products_with_discount(), createCheckoutService, addProductToCheckoutService)
+	deleteCheckoutService := services.NewDeleteCheckout(checkoutRepository)
+	app.Initialize(checkoutRepository, productRepository, populate_products_with_promotion(), populate_products_with_discount(), createCheckoutService, addProductToCheckoutService, deleteCheckoutService)
 
 	app.Run(":3080")
 }
