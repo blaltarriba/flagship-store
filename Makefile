@@ -9,7 +9,7 @@ build: ## Build project
 
 	docker build -t flagship-store .
 
-env-start: ## Start project container
+run: ## Start project container
 	docker run --rm -it -p 3080:3080 flagship-store
 
 test:
