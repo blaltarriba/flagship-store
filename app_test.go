@@ -27,9 +27,10 @@ func TestMain(m *testing.M) {
 	productsWithDiscountRepository := initialize_products_with_discount()
 	createCheckoutService := services.NewCreateCheckout(checkoutRepository, productRepository)
 	addProductToCheckoutService := services.NewAddProductToCheckout(checkoutRepository, productRepository)
+	deleteCheckoutService := services.NewDeleteCheckout(checkoutRepository)
 
 	app = App{}
-	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService, addProductToCheckoutService)
+	app.Initialize(checkoutRepository, productRepository, productsWithPromotionRepository, productsWithDiscountRepository, createCheckoutService, addProductToCheckoutService, deleteCheckoutService)
 
 	code := m.Run()
 
@@ -342,44 +343,32 @@ func TestAmountWithNoDiscountWhenCheckoutDoesNotContainsThreeOfSameProductWithDi
 }
 
 func TestReturn204WhenDeleteCheckout(t *testing.T) {
-	clearCheckouts()
-
 	checkout := models.Checkout{
 		Id:       uuid.NewString(),
 		Products: []string{"PEN"},
 	}
-	app.CheckoutRepository.Persist(checkout)
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", checkout.Id).Return(checkout, true)
+	theCheckoutRepositoryMock.On("Delete", checkout)
+	app.DeleteCheckoutService = services.NewDeleteCheckout(&theCheckoutRepositoryMock)
 
 	req, _ := http.NewRequest("DELETE", "/checkouts/"+checkout.Id, nil)
 	response := executeRequest(req)
 
 	assert.EqualValues(t, 204, response.Code)
-}
-
-func TestDeleteCheckout(t *testing.T) {
-	clearCheckouts()
-
-	checkout := models.Checkout{
-		Id:       uuid.NewString(),
-		Products: []string{"PEN"},
-	}
-	app.CheckoutRepository.Persist(checkout)
-
-	req, _ := http.NewRequest("DELETE", "/checkouts/"+checkout.Id, nil)
-	executeRequest(req)
-
-	assert.EqualValues(t, 0, app.CheckoutRepository.Count())
+	theCheckoutRepositoryMock.AssertExpectations(t)
 }
 
 func TestReturn404DeletingCheckoutWhenCheckoutDoesNotExists(t *testing.T) {
-	clearCheckouts()
+	theCheckoutRepositoryMock := mocks.CheckoutRepositoryMock{}
+	theCheckoutRepositoryMock.On("SearchById", "a_fake_checkout").Return(models.Checkout{}, false)
+	app.DeleteCheckoutService = services.NewDeleteCheckout(&theCheckoutRepositoryMock)
 
 	req, _ := http.NewRequest("DELETE", "/checkouts/a_fake_checkout", nil)
 	response := executeRequest(req)
 
 	var checkoutNotFound responses.CheckoutNotFound
 	json.Unmarshal(response.Body.Bytes(), &checkoutNotFound)
-
 	assert.EqualValues(t, 404, response.Code)
 	assert.EqualValues(t, "Checkout a_fake_checkout not found", checkoutNotFound.Message)
 }

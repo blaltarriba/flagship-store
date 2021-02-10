@@ -24,15 +24,17 @@ type App struct {
 	ProductsWithDiscountRepository  persistence.ProductRepository
 	CreateCheckoutService           services.CreateCheckout
 	AddProductToCheckoutService     services.AddProductToCheckout
+	DeleteCheckoutService           services.DeleteCheckout
 }
 
-func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout, addProductToCheckoutService services.AddProductToCheckout) {
+func (app *App) Initialize(checkoutRepository persistence.CheckoutRepository, productsRepository persistence.ProductRepository, productsWithPromotionRepository persistence.ProductRepository, productsWithDiscountRepository persistence.ProductRepository, createCheckoutService services.CreateCheckout, addProductToCheckoutService services.AddProductToCheckout, deleteCheckoutService services.DeleteCheckout) {
 	app.CheckoutRepository = checkoutRepository
 	app.ProductRepository = productsRepository
 	app.ProductsWithPromotionRepository = productsWithPromotionRepository
 	app.ProductsWithDiscountRepository = productsWithDiscountRepository
 	app.CreateCheckoutService = createCheckoutService
 	app.AddProductToCheckoutService = addProductToCheckoutService
+	app.DeleteCheckoutService = deleteCheckoutService
 	app.Router = mux.NewRouter().StrictSlash(true)
 	app.initializeRoutes()
 }
@@ -186,8 +188,9 @@ func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Reque
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	checkout, existCheckout := app.CheckoutRepository.SearchById(id)
-	if !existCheckout {
+	_, err := app.DeleteCheckoutService.Do(id)
+
+	if _, ok := err.(*errors.CheckoutNotFoundError); ok {
 		response.WriteHeader(http.StatusNotFound)
 		checkoutNotFound := responses.CheckoutNotFound{
 			Message: "Checkout " + id + " not found",
@@ -195,8 +198,6 @@ func (app *App) deleteCheckout(response http.ResponseWriter, request *http.Reque
 		json.NewEncoder(response).Encode(checkoutNotFound)
 		return
 	}
-
-	app.CheckoutRepository.Delete(checkout)
 
 	response.WriteHeader(http.StatusNoContent)
 }
