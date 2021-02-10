@@ -1,9 +1,11 @@
 # Lana Flagship Store
 
-Project to resolve Lana store challenge.
+Project to resolve Lana store challenge. Made with Golang :clap :clap
 
 
 ## Installation
+
+*Golang disclaimer*: Project should be at _$GOPATH/src/lana/_
 
 To install the project run:
 
