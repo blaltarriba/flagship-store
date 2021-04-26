@@ -1,6 +1,6 @@
 # Lana Flagship Store
 
-Project to resolve Lana store challenge. Made with Golang :clap :clap
+Project to resolve Lana store challenge. Made with Golang :clap :clap (my first code in Golang actually)
 
 
 ## Installation
